@@ -1,0 +1,77 @@
+name: Train online models
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_bundle_url:
+        description: "Optional zip/tar URL containing real data inputs such as features/ or modeling/"
+        required: false
+        default: ""
+      model_table_url:
+        description: "Optional direct URL for a prebuilt historical model table parquet"
+        required: false
+        default: ""
+      model_table:
+        description: "Path to the historical model table available in the runner"
+        required: false
+        default: "modeling/model_table_ddfe_root_country_clean_full.parquet"
+
+permissions:
+  contents: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    env:
+      DATA_BUNDLE_URL: ${{ github.event.inputs.data_bundle_url || vars.ONLINE_DATA_BUNDLE_URL || '' }}
+      ONLINE_MODEL_TABLE_URL: ${{ github.event.inputs.model_table_url || vars.ONLINE_MODEL_TABLE_URL || '' }}
+      MODEL_TABLE: ${{ github.event.inputs.model_table || 'modeling/model_table_ddfe_root_country_clean_full.parquet' }}
+      EVENT_LONG_DIR: features/event_long_clean_full
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Prepare real data inputs
+        run: |
+          python src/online/prepare_ci_inputs.py \
+            --output_dir . \
+            --data_bundle_url "$DATA_BUNDLE_URL" \
+            --model_table_url "$ONLINE_MODEL_TABLE_URL" \
+            --model_table "$MODEL_TABLE"
+
+      - name: Build model table when event history is available
+        run: |
+          if [ -d "$EVENT_LONG_DIR" ]; then
+            PROJECT_ROOT="$PWD" \
+            EVENT_LONG_DIR="$EVENT_LONG_DIR" \
+            ONLINE_MODEL_TABLE="$MODEL_TABLE" \
+            PYTHON_BIN=python \
+            bash src/pipelines/build_online_model_table.sh
+          fi
+
+      - name: Train final online models
+        run: |
+          if [ ! -f "$MODEL_TABLE" ]; then
+            echo "Missing model table: $MODEL_TABLE"
+            echo "Configure ONLINE_DATA_BUNDLE_URL or ONLINE_MODEL_TABLE_URL with real historical data."
+            exit 1
+          fi
+          python src/online/train_online_models.py \
+            --model_table "$MODEL_TABLE" \
+            --output_dir artifacts/online
+
+      - name: Upload online model artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: online-model-artifacts
+          path: artifacts/online

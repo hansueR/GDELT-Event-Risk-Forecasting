@@ -4,6 +4,8 @@ __pycache__/
 .DS_Store
 
 data/
+!dashboard/data/
+!dashboard/data/*.json
 raw_zip/
 clean/
 clean_full/

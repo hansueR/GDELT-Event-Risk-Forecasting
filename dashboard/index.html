@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GDELT Event Risk Forecasting Dashboard</title>
+    <link rel="stylesheet" href="assets/style.css" />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>GDELT Event Risk Forecasting</h1>
+        <p>Live event-driven short-horizon volatility alerts.</p>
+      </div>
+      <div id="status" class="status">Loading dashboard data...</div>
+    </header>
+
+    <main>
+      <section class="controls" aria-label="Dashboard filters">
+        <label>
+          Asset
+          <select id="assetSelect"></select>
+        </label>
+        <label>
+          Horizon
+          <select id="horizonSelect"></select>
+        </label>
+        <label>
+          Forecast / alert method
+          <select id="methodSelect"></select>
+        </label>
+        <label>
+          Start
+          <input id="startDate" type="date" />
+        </label>
+        <label>
+          End
+          <input id="endDate" type="date" />
+        </label>
+      </section>
+
+      <section id="message" class="message" hidden></section>
+      <section class="note">
+        The event-intensity curve is an aggregate visualization signal. The online model uses the full feature schema saved from the training pipeline.
+      </section>
+
+      <section class="grid">
+        <article class="panel wide">
+          <h2>Latest Forecast</h2>
+          <div id="latestCard" class="latestGrid"></div>
+        </article>
+        <article class="panel wide">
+          <h2>Close Price and Event Intensity</h2>
+          <div id="priceEventChart" class="chart"></div>
+        </article>
+        <article class="panel wide">
+          <h2>Predicted Volatility vs Actual Realized Volatility</h2>
+          <div id="forecastChart" class="chart"></div>
+        </article>
+        <article class="panel wide">
+          <h2>Alert Score Over Time</h2>
+          <div id="alertScoreChart" class="chart compact"></div>
+        </article>
+        <article class="panel">
+          <h2>Alert Metrics by Method</h2>
+          <div id="alertMetricsChart" class="chart compact"></div>
+        </article>
+        <article class="panel">
+          <h2>Latest Predictions</h2>
+          <div class="tableWrap">
+            <table id="latestTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="panel wide">
+          <h2>Historical Method Performance</h2>
+          <div class="tableWrap">
+            <table id="summaryTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="assets/app.js"></script>
+  </body>
+</html>
