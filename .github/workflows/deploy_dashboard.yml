@@ -1,6 +1,8 @@
 name: Deploy dashboard
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -42,7 +44,7 @@ jobs:
         run: |
           python src/dashboard/validate_dashboard_data.py \
             --data_dir dashboard/data \
-            --mode "${{ inputs.mode }}"
+            --mode "${{ inputs.mode || 'static' }}"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
