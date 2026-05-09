@@ -30,6 +30,17 @@ METHOD_DIRS = {
 SUMMARY_COLUMNS = ["method", "asset", "horizon", "mae", "rmse", "r2", "qlike", "auc", "ap", "p_at_10", "r_at_10"]
 ALERT_COLUMNS = ["method", "asset", "horizon", "auc", "ap", "p_at_10", "r_at_10"]
 SERIES_COLUMNS = ["date", "asset", "close", "event_intensity", "shock_day", "horizon", "realized_volatility", "forecasts", "alert_scores"]
+HISTORY_COLUMNS = [
+    "prediction_date",
+    "asset",
+    "horizon",
+    "method",
+    "predicted_log_rv",
+    "actual_log_rv",
+    "alert_score",
+    "risk_level",
+    "status",
+]
 
 
 def warn(message, warnings):
@@ -347,6 +358,49 @@ def build_metrics(results_dir, warnings):
     return grouped[SUMMARY_COLUMNS], grouped[ALERT_COLUMNS]
 
 
+def risk_level(score):
+    if score is None or pd.isna(score):
+        return "unknown"
+    if score >= 0.8:
+        return "high"
+    if score >= 0.5:
+        return "elevated"
+    return "normal"
+
+
+def build_prediction_history(predictions, warnings):
+    if predictions.empty:
+        warn("No fold_predictions.csv files found; historical prediction charts will be empty.", warnings)
+        return pd.DataFrame(columns=HISTORY_COLUMNS)
+
+    required = {"date", "asset", "target", "method"}
+    if not required.issubset(predictions.columns):
+        warn("fold_predictions.csv files are missing required date/asset/target/method columns.", warnings)
+        return pd.DataFrame(columns=HISTORY_COLUMNS)
+
+    work = predictions.copy()
+    work["prediction_date"] = pd.to_datetime(work["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    work["horizon"] = work["target"].map(horizon_from_target)
+    work["predicted_log_rv"] = work["y_pred"] if "y_pred" in work.columns else np.nan
+
+    # For alert-only experiments y_true is a binary high-volatility label, not a log-RV value.
+    is_log_target = work["target"].astype(str).str.contains("log", case=False, na=False)
+    work["actual_log_rv"] = np.where(is_log_target & work.get("y_true", pd.Series(np.nan, index=work.index)).notna(), work["y_true"], np.nan)
+
+    if "y_score" in work.columns:
+        work["alert_score"] = work["y_score"]
+    elif "residual_score" in work.columns:
+        work["alert_score"] = work["residual_score"]
+    else:
+        work["alert_score"] = np.nan
+
+    work["risk_level"] = [risk_level(score) for score in work["alert_score"]]
+    work["status"] = "historical"
+    out = work[HISTORY_COLUMNS].dropna(subset=["prediction_date", "asset", "horizon", "method"]).copy()
+    out = out.drop_duplicates(subset=["prediction_date", "asset", "horizon", "method"], keep="last")
+    return out.sort_values(["prediction_date", "asset", "horizon", "method"]).reset_index(drop=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build small static JSON files for the public dashboard.")
     default_table = default_model_table()
@@ -379,6 +433,7 @@ def main():
     predictions = read_result_frames(args.results_dir, "fold_predictions.csv", warnings)
     series = attach_scores(series, predictions, warnings)
     summary, alert = build_metrics(args.results_dir, warnings)
+    history = build_prediction_history(predictions, warnings)
 
     metadata = {
         "project": "GDELT Event-Driven Volatility Risk Forecasting",
@@ -389,6 +444,7 @@ def main():
         "series_rows": int(len(series)),
         "summary_metric_rows": int(len(summary)),
         "alert_metric_rows": int(len(alert)),
+        "historical_prediction_rows": int(len(history)),
         "row_policy": "full_history" if args.max_rows_per_asset_horizon is None else f"tail_{args.max_rows_per_asset_horizon}_per_asset_horizon",
         "model_table": str(args.model_table) if args.model_table else None,
         "results_dir": str(args.results_dir),
@@ -398,6 +454,34 @@ def main():
     write_json(output_dir / "dashboard_series.json", {"series": records(series), "warnings": warnings})
     write_json(output_dir / "summary_metrics.json", {"metrics": records(summary), "warnings": warnings})
     write_json(output_dir / "alert_metrics.json", {"metrics": records(alert), "warnings": warnings})
+    write_json(
+        output_dir / "latest_predictions.json",
+        {
+            "generated_at": metadata["generated_at"],
+            "mode": "static_historical",
+            "predictions": [],
+            "warnings": [],
+        },
+    )
+    write_json(
+        output_dir / "prediction_history.json",
+        {
+            "generated_at": metadata["generated_at"],
+            "mode": "static_historical",
+            "predictions": records(history),
+            "warnings": warnings,
+        },
+    )
+    write_json(
+        output_dir / "model_metadata.json",
+        {
+            "generated_at": metadata["generated_at"],
+            "mode": "static_historical",
+            "training_end_date": None,
+            "model_table": str(args.model_table) if args.model_table else None,
+            "warnings": [],
+        },
+    )
     write_json(output_dir / "metadata.json", metadata)
     print(f"Wrote dashboard data to {output_dir}")
 

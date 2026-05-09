@@ -1,0 +1,7 @@
+{
+  "generated_at": "2026-05-09T06:25:20+00:00",
+  "mode": "static_historical",
+  "training_end_date": null,
+  "model_table": "/project/hrao/GDELT/modeling/model_table_ddfe_root_country_clean_full.parquet",
+  "warnings": []
+}

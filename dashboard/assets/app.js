@@ -241,7 +241,7 @@ function renderSummaryTable() {
 function renderMessage(warnings) {
   const messages = [...warnings];
   if (!state.series.length && !state.latest.length && !state.history.length) messages.push("No real dashboard data is available.");
-  if (!methodRows(state.history).length && !latestSelection()) messages.push("No online prediction rows match the selected filters.");
+  if (!methodRows(state.history).length && !latestSelection()) messages.push("No historical prediction rows match the selected filters.");
   els.message.hidden = messages.length === 0;
   els.message.textContent = messages.join(" ");
 }
@@ -291,7 +291,7 @@ async function init() {
   [els.asset, els.horizon, els.method, els.start, els.end].forEach((el) => el.addEventListener("change", () => render(warnings)));
   els.status.textContent = state.modelMetadata.training_end_date
     ? `Online model trained through ${state.modelMetadata.training_end_date}`
-    : "No live model metadata loaded";
+    : "Static historical dashboard";
   render(warnings);
 }
 
