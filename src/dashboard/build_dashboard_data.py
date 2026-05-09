@@ -368,6 +368,11 @@ def risk_level(score):
     return "normal"
 
 
+def first_non_null(series):
+    values = series.dropna()
+    return values.iloc[0] if not values.empty else np.nan
+
+
 def build_prediction_history(predictions, warnings):
     if predictions.empty:
         warn("No fold_predictions.csv files found; historical prediction charts will be empty.", warnings)
@@ -397,7 +402,17 @@ def build_prediction_history(predictions, warnings):
     work["risk_level"] = [risk_level(score) for score in work["alert_score"]]
     work["status"] = "historical"
     out = work[HISTORY_COLUMNS].dropna(subset=["prediction_date", "asset", "horizon", "method"]).copy()
-    out = out.drop_duplicates(subset=["prediction_date", "asset", "horizon", "method"], keep="last")
+    out = (
+        out.groupby(["prediction_date", "asset", "horizon", "method"], as_index=False)
+        .agg(
+            predicted_log_rv=("predicted_log_rv", first_non_null),
+            actual_log_rv=("actual_log_rv", first_non_null),
+            alert_score=("alert_score", first_non_null),
+            status=("status", first_non_null),
+        )
+    )
+    out["risk_level"] = [risk_level(score) for score in out["alert_score"]]
+    out = out[HISTORY_COLUMNS]
     return out.sort_values(["prediction_date", "asset", "horizon", "method"]).reset_index(drop=True)
 
 

@@ -191,9 +191,10 @@ function renderForecast(rows) {
 }
 
 function renderAlertScore(rows) {
+  const scoredRows = rows.filter((row) => row.alert_score !== null && row.alert_score !== undefined && !Number.isNaN(Number(row.alert_score)));
   Plotly.react("alertScoreChart", [{
-    x: rows.map((row) => row.prediction_date),
-    y: rows.map((row) => row.alert_score),
+    x: scoredRows.map((row) => row.prediction_date),
+    y: scoredRows.map((row) => row.alert_score),
     name: "Alert score",
     type: "scatter",
     mode: "lines+markers",
